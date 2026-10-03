@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>اقتحام — فريق التدخل السريع</title>
+<style>
+:root{
+  --bg:#0b0f14; --panel:#131c27; --line:#243244; --tape:#f4c21b; --tape2:#15130a;
+  --red:#e2434d; --blue:#4f8dff; --ok:#43c47b; --bone:#e9e4d6; --grey:#8d99a6;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;touch-action:none}
+html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:Tahoma,Arial,"Segoe UI",sans-serif;color:var(--bone)}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+#app{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000}
+#view{background:#1a2230;max-width:100%;max-height:100%;touch-action:none}
+
+#hud{position:absolute;inset:0;pointer-events:none;display:none}
+#hud.on{display:block}
+#obj{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));right:10px;background:rgba(10,14,20,.68);border-right:3px solid var(--tape);padding:.5rem .7rem;font-size:.82rem;line-height:1.5;min-width:170px}
+#obj b{display:block;font-size:.88rem;margin-bottom:2px}
+#obj .d{color:var(--ok)}
+#vitals{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));left:10px;background:rgba(10,14,20,.68);padding:.45rem .7rem;font-size:.8rem;display:flex;flex-direction:column;gap:4px;min-width:140px}
+#vitals .bar{width:120px;height:8px;background:#26313f}
+#vitals .bar i{display:block;height:100%;width:100%;background:var(--red)}
+#toast{position:absolute;left:50%;top:18%;transform:translateX(-50%);font-weight:800;font-size:1.15rem;text-shadow:0 2px 3px #000;opacity:0;transition:opacity .35s;white-space:nowrap}
+#toast.on{opacity:1}
+#toast.good{color:var(--ok)} #toast.bad{color:var(--red)} #toast.info{color:var(--tape)}
+#holdwrap{position:absolute;left:50%;bottom:28%;transform:translateX(-50%);display:none;flex-direction:column;align-items:center;gap:4px}
+#holdwrap.on{display:flex}
+#holdwrap span{font-size:.8rem;background:rgba(10,14,20,.7);padding:1px 8px}
+#holdbar{width:90px;height:6px;background:#26313f}
+#holdbar i{display:block;height:100%;width:0;background:var(--tape)}
+
+#bars{position:absolute;bottom:calc(8px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);display:flex;gap:8px;pointer-events:auto}
+#bars button{font:inherit;font-size:.72rem;font-weight:700;color:var(--bone);background:#17202c;border:1px solid var(--line);padding:4px 9px;cursor:pointer}
+#bars button kbd{color:var(--tape);font-weight:800}
+
+#touch{position:absolute;inset:0;display:none}
+body.touch.playing #touch{display:block}
+#joyZone{position:absolute;inset:0}
+#stick{position:absolute;width:104px;height:104px;margin:-52px 0 0 -52px;border:2px solid rgba(233,228,214,.35);border-radius:50%;display:none}
+#stick i{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:rgba(233,228,214,.28)}
+.tb{position:absolute;font:inherit;font-weight:800;color:var(--bone);background:rgba(23,32,44,.8);border:2px solid var(--line);border-radius:50%;display:flex;align-items:center;justify-content:center;pointer-events:auto;z-index:2}
+.tb:active,.tb.on{background:rgba(244,194,27,.35);border-color:var(--tape)}
+#tFire{left:calc(16px + env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));width:88px;height:88px;font-size:.95rem;border-color:var(--red)}
+#tUse{left:calc(108px + env(safe-area-inset-left,0px));bottom:calc(96px + env(safe-area-inset-bottom,0px));width:62px;height:62px;font-size:.72rem}
+#tShout{left:calc(16px + env(safe-area-inset-left,0px));bottom:calc(104px + env(safe-area-inset-bottom,0px));width:62px;height:62px;font-size:.72rem}
+#tPause{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);width:auto;height:30px;border-radius:5px;padding:0 12px;font-size:.72rem;pointer-events:auto;z-index:2}
+body.touch #bars{display:none}
+
+.scr{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(6,9,13,.94);padding:16px;overflow:auto;z-index:30}
+.scr.on{display:flex}
+.pnl{width:min(620px,100%);background:var(--panel);border:1px solid var(--line);padding:22px 24px;display:flex;flex-direction:column;gap:14px;max-height:100%;overflow:auto}
+.pnl h1{margin:0;font-size:clamp(2.1rem,7vw,3.1rem);font-weight:900}
+.pnl h2{margin:0;font-size:1.4rem;font-weight:800}
+.pnl p{margin:0;line-height:1.7;color:#cdc8bb}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.btn{font:inherit;font-weight:800;font-size:1rem;padding:.65em 1.4em;border:2px solid var(--tape);background:var(--tape);color:var(--tape2);cursor:pointer}
+.btn.ghost{background:transparent;color:var(--bone);border-color:#334257}
+ul.rules{margin:0;padding:0 1.1rem 0 0;line-height:1.85;color:#d7d2c5;font-size:.93rem}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:10px 20px}
+@media(max-width:520px){.cols{grid-template-columns:1fr}}
+.cols h3{margin:0 0 4px;font-size:.98rem;color:var(--tape)}
+kbd{font:inherit;font-weight:800;background:#233049;padding:0 6px}
+#grade{font-size:5rem;font-weight:900;margin:0;line-height:1}
+.resGrid{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+dl{margin:0;display:grid;grid-template-columns:auto auto;gap:3px 14px;font-size:.92rem}
+dt{color:var(--grey)} dd{margin:0;font-weight:800}
+.pens{margin:0;padding:0 1rem 0 0;font-size:.85rem;color:#eda0a0;line-height:1.8}
+</style>
+</head>
+<body>
+<div id="app">
+<canvas id="view" width="960" height="540"></canvas>
+
+<div id="hud">
+  <div id="obj"><b>المهمة</b><div id="objList"></div></div>
+  <div id="vitals">
+    <div>صحة <span class="bar"><i id="hpBar"></i></span></div>
+  </div>
+  <div id="toast"></div>
+  <div id="holdwrap"><span id="holdTxt">تقييد...</span><div id="holdbar"><i></i></div></div>
+  <div id="bars">
+    <button id="bFire"><kbd>Space</kbd> إطلاق</button>
+    <button id="bShout"><kbd>F</kbd> شرطة!</button>
+    <button id="bUse"><kbd>E</kbd> تقييد</button>
+    <button id="bPause"><kbd>Esc</kbd> إيقاف</button>
+  </div>
+</div>
+
+<div id="touch">
+  <div id="joyZone"></div>
+  <div id="stick"><i></i></div>
+  <button class="tb" id="tFire">إطلاق</button>
+  <button class="tb" id="tUse">تقييد</button>
+  <button class="tb" id="tShout">شرطة!</button>
+  <button class="tb" id="tPause">إيقاف</button>
+</div>
+
+<div class="scr on" id="scTitle">
+  <div class="pnl">
+    <h1>اقتحام</h1>
+    <p>أنت قائد وحدة التدخل السريع. ادخل المبنى، أمّن المشتبهين، واحمِ المدنيين — ثم اخرج من نفس المدخل.</p>
+    <div class="row"><button class="btn" id="bStart">ابدأ العملية</button><button class="btn ghost" id="bHow">طريقة اللعب</button></div>
+  </div>
+</div>
+
+<div class="scr" id="scHow">
+  <div class="pnl">
+    <h2>طريقة اللعب</h2>
+    <div class="cols">
+      <div><h3>كمبيوتر</h3><ul class="rules">
+        <li><kbd>W A S D</kbd> حركة، والفأرة تحدّد اتجاه التصويب</li>
+        <li><kbd>Space</kbd> أو زر الفأرة: إطلاق النار (فيها مساعدة تصويب تلقائية للهدف الأقرب أمامك)</li>
+        <li><kbd>F</kbd>: نادِ «شرطة!» — المشتبه القريب قد يستسلم</li>
+        <li><kbd>E</kbd> مطولًا: قيّد مشتبهًا مستسلمًا قريبًا</li>
+        <li><kbd>Esc</kbd>: إيقاف مؤقت</li>
+      </ul></div>
+      <div><h3>موبايل</h3><ul class="rules">
+        <li>اسحب في أي مكان بالشاشة للحركة — شخصيتك تتجه تلقائيًا لجهة حركتك وتصوّب معها</li>
+        <li>أزرار: إطلاق (فيها مساعدة تصويب)، شرطة!، تقييد (اضغط مطولًا)</li>
+      </ul></div>
+    </div>
+    <p>لا تطلق النار على مستسلم أو مدني — تُخصم نقاط كبيرة. التنبيه يبقى محصورًا داخل نفس الغرفة، فبإمكانك التعامل مع كل غرفة بهدوء على حدة.</p>
+    <div class="row"><button class="btn" id="bHowBack">تمام، فهمت</button></div>
+  </div>
+</div>
+
+<div class="scr" id="scPause">
+  <div class="pnl" style="width:min(380px,100%)">
+    <h2>إيقاف مؤقت</h2>
+    <div class="row" style="flex-direction:column">
+      <button class="btn" id="bResume">متابعة</button>
+      <button class="btn ghost" id="bRestart">إعادة المهمة</button>
+      <button class="btn ghost" id="bMenu1">القائمة الرئيسية</button>
+    </div>
+  </div>
+</div>
+
+<div class="scr" id="scResult">
+  <div class="pnl">
+    <h2 id="rTitle">انتهت العملية</h2>
+    <div class="resGrid">
+      <p id="grade">C</p>
+      <dl id="rStats"></dl>
+    </div>
+    <ul class="pens" id="rPens"></ul>
+    <div class="row"><button class="btn" id="bAgain">أعد العملية</button><button class="btn ghost" id="bMenu2">القائمة الرئيسية</button></div>
+  </div>
+</div>
+</div>
+
+<script>
+(function(){
+"use strict";
+var cv=document.getElementById('view'), ctx=cv.getContext('2d');
+var W=960,H=540;
+var isTouch = matchMedia('(pointer:coarse)').matches || 'ontouchstart' in window;
+if(isTouch) document.body.classList.add('touch');
+
+function fit(){
+  var vw=innerWidth, vh=innerHeight, s=Math.min(vw/W, vh/H);
+  cv.style.width=(W*s)+'px'; cv.style.height=(H*s)+'px';
+}
+addEventListener('resize',fit); fit();
+
+// ---------- MAP (3 open-bottom rooms off one wide corridor — no pinch-point doorways) ----------
+var WALL=14;
+function seg(x,y,w,h){return {x:x,y:y,w:w,h:h};}
+var DIV1=340, DIV2=606, ROOMTOP=20, ROOMBOTTOM=330;
+var walls=[
+  seg(20,20,900,WALL),            // top
+  seg(20,20,WALL,500),            // left
+  seg(906,20,WALL,500),           // right
+  seg(20,506,380,WALL),           // bottom-left (exit gap 400-560)
+  seg(560,506,360,WALL),          // bottom-right
+  seg(DIV1,ROOMTOP,WALL,ROOMBOTTOM-ROOMTOP),   // room A/B divider, open below 330
+  seg(DIV2,ROOMTOP,WALL,ROOMBOTTOM-ROOMTOP)    // room B/C divider, open below 330
+];
+var EXIT = {x:400,y:470,w:160,h:50};
+function roomOf(x){ return x<DIV1 ? 'A' : (x<DIV2 ? 'B' : 'C'); }
+
+// ---------- ENTITIES ----------
+function mkSuspect(x,y,kind,extra){
+  return {x:x,y:y,r:14,kind:kind,compliant:kind==='armed'?!!extra:false,variant:kind==='civilian'?(extra||'a'):null,room:roomOf(x),state:'idle'};
+}
+var ROOMS={A:{x0:54,x1:306,y0:54,y1:310},B:{x0:374,x1:586,y0:54,y1:310},C:{x0:640,x1:886,y0:54,y1:310}};
+function shuffle(a){ for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
+function randIn(r){ return {x:r.x0+Math.random()*(r.x1-r.x0), y:r.y0+Math.random()*(r.y1-r.y0)}; }
+function genSuspects(){
+  var rooms=shuffle(['A','A','B','B','C','C']);
+  var kinds=shuffle(['armed','armed','armed','armed','civilian','civilian']);
+  var list=[];
+  for(var i=0;i<6;i++){
+    var pos=randIn(ROOMS[rooms[i]]);
+    if(kinds[i]==='armed') list.push(mkSuspect(pos.x,pos.y,'armed', Math.random()<0.5));
+    else list.push(mkSuspect(pos.x,pos.y,'civilian', Math.random()<0.5?'a':'b'));
+  }
+  return list;
+}
+
+var player, suspects, alertRooms, started, elapsed, score, pens, stats, state, flashes, holding, holdT;
+
+function reset(){
+  player={x:480,y:495,ang:-Math.PI/2,hp:100,speed:150};
+  suspects=genSuspects();
+  alertRooms={A:false,B:false,C:false}; started=false; elapsed=0; score=0; pens=[]; flashes=[];
+  holding=false; holdT=0;
+  stats={arrested:0,neutralized:0,rescued:0,casualty:0,shotsFired:0};
+  state='playing';
+  updateObjectives(); updateHP();
+}
+reset();
+
+function armedLeft(){return suspects.filter(function(s){return s.kind==='armed' && s.state!=='arrested' && s.state!=='down';}).length;}
+function civLeft(){return suspects.filter(function(s){return s.kind==='civilian' && s.state==='idle';}).length;}
+
+function updateObjectives(){
+  var el=document.getElementById('objList');
+  var a=armedLeft();
+  var totalArmed=suspects.filter(function(s){return s.kind==='armed';}).length;
+  var totalCiv=suspects.filter(function(s){return s.kind==='civilian';}).length;
+  el.innerHTML =
+    '<div class="'+(a===0?'d':'')+'">• تحييد/تقييد المسلحين: '+(totalArmed-a)+'/'+totalArmed+'</div>'+
+    '<div>• إنقاذ المدنيين: '+stats.rescued+'/'+totalCiv+'</div>'+
+    '<div class="'+(a===0?'d':'')+'">• '+(a===0?'عد إلى نقطة الخروج':'أمّن كل المسلحين أولاً')+'</div>';
+}
+function updateHP(){ document.getElementById('hpBar').style.width=Math.max(0,player.hp)+'%'; }
+
+function toast(msg,cls){
+  var t=document.getElementById('toast'); t.textContent=msg; t.className='on '+(cls||'');
+  clearTimeout(toast._h); toast._h=setTimeout(function(){t.className='';},1100);
+}
+
+// ---------- GEOMETRY ----------
+function resolveCircleRect(x,y,r,rect){
+  var cx=Math.max(rect.x,Math.min(x,rect.x+rect.w));
+  var cy=Math.max(rect.y,Math.min(y,rect.y+rect.h));
+  var dx=x-cx, dy=y-cy, d=Math.hypot(dx,dy);
+  if(d<r && d>0.0001){ var push=(r-d)/d; return {x:x+dx*push,y:y+dy*push}; }
+  if(d===0){ return {x:x,y:y-r}; }
+  return {x:x,y:y};
+}
+function resolveWalls(x,y,r){
+  // two passes so a push out of one wall can't re-embed the player in a neighbor
+  for(var pass=0; pass<2; pass++){
+    for(var i=0;i<walls.length;i++){ var p=resolveCircleRect(x,y,r,walls[i]); x=p.x; y=p.y; }
+  }
+  return {x:x,y:y};
+}
+function pointInWalls(x,y){
+  for(var i=0;i<walls.length;i++){ var w=walls[i]; if(x>=w.x&&x<=w.x+w.w&&y>=w.y&&y<=w.y+w.h) return true; }
+  return false;
+}
+function hasLOS(x1,y1,x2,y2){
+  var d=Math.hypot(x2-x1,y2-y1), steps=Math.ceil(d/8);
+  for(var i=1;i<steps;i++){
+    var t=i/steps;
+    if(pointInWalls(x1+(x2-x1)*t, y1+(y2-y1)*t)) return false;
+  }
+  return true;
+}
+function raycastHit(ox,oy,ang,maxD){
+  var step=6, dx=Math.cos(ang), dy=Math.sin(ang);
+  for(var d=0; d<maxD; d+=step){
+    var x=ox+dx*d, y=oy+dy*d;
+    if(pointInWalls(x,y)) return {x:x,y:y,hit:'wall'};
+    for(var i=0;i<suspects.length;i++){
+      var s=suspects[i]; if(s.state==='arrested'||s.state==='down') continue;
+      if(Math.hypot(x-s.x,y-s.y)<s.r) return {x:x,y:y,hit:'ent',ent:s};
+    }
+  }
+  return {x:ox+dx*maxD,y:oy+dy*maxD,hit:'none'};
+}
+
+// ---------- INPUT ----------
+var keys={};
+addEventListener('keydown',function(e){
+  keys[e.code]=true;
+  if(state!=='playing') return;
+  if(e.code==='KeyF') doShout();
+  if(e.code==='Space') doFire();
+  if(e.code==='Escape') pause();
+});
+addEventListener('keyup',function(e){keys[e.code]=false;});
+cv.addEventListener('mousemove',function(e){
+  var r=cv.getBoundingClientRect();
+  var mx=(e.clientX-r.left)*(W/r.width), my=(e.clientY-r.top)*(H/r.height);
+  player.ang=Math.atan2(my-player.y, mx-player.x);
+});
+cv.addEventListener('mousedown',function(){ if(state==='playing') doFire(); });
+
+document.getElementById('bFire').onclick=doFire;
+document.getElementById('bShout').onclick=doShout;
+document.getElementById('bPause').onclick=pause;
+var useBtn=document.getElementById('bUse');
+useBtn.addEventListener('mousedown',function(){holding=true;});
+useBtn.addEventListener('mouseup',function(){holding=false;});
+useBtn.addEventListener('mouseleave',function(){holding=false;});
+
+// single touch joystick: drag anywhere to move, character auto-faces movement
+var moveVec={x:0,y:0};
+(function(){
+  var zone=document.getElementById('joyZone'), active=null, ox=0,oy=0;
+  zone.addEventListener('touchstart',function(e){
+    var t=e.changedTouches[0]; active=t.identifier; ox=t.clientX; oy=t.clientY;
+    var st=document.getElementById('stick'); st.style.display='block'; st.style.left=ox+'px'; st.style.top=oy+'px';
+    e.preventDefault();
+  },{passive:false});
+  zone.addEventListener('touchmove',function(e){
+    for(var i=0;i<e.changedTouches.length;i++){
+      var t=e.changedTouches[i]; if(t.identifier!==active) continue;
+      var dx=t.clientX-ox, dy=t.clientY-oy, d=Math.hypot(dx,dy), md=52;
+      if(d>md){dx=dx/d*md; dy=dy/d*md;}
+      moveVec={x:dx/md,y:dy/md};
+      var st=document.getElementById('stick'); st.style.left=(ox+dx)+'px'; st.style.top=(oy+dy)+'px';
+    }
+    e.preventDefault();
+  },{passive:false});
+  function end(e){
+    for(var i=0;i<e.changedTouches.length;i++){ var t=e.changedTouches[i]; if(t.identifier!==active) continue; active=null; moveVec={x:0,y:0}; document.getElementById('stick').style.display='none'; }
+  }
+  zone.addEventListener('touchend',end); zone.addEventListener('touchcancel',end);
+})();
+function bindHold(id,fn,isHold){
+  var el=document.getElementById(id);
+  el.addEventListener('touchstart',function(e){e.preventDefault(); if(isHold) holding=true; else fn();},{passive:false});
+  if(isHold) el.addEventListener('touchend',function(e){e.preventDefault(); holding=false;});
+}
+bindHold('tFire',doFire,false);
+bindHold('tShout',doShout,false);
+bindHold('tUse',null,true);
+document.getElementById('tPause').addEventListener('touchstart',function(e){e.preventDefault();pause();});
+
+// ---------- ACTIONS ----------
+function doShout(){
+  if(state!=='playing') return;
+  var got=false;
+  suspects.forEach(function(s){
+    if(s.kind!=='armed'||s.state!=='idle') return;
+    if(Math.hypot(s.x-player.x,s.y-player.y)>170) return;
+    got=true;
+    if(s.compliant || Math.random()<0.4){ s.state='surrendered'; }
+    else { s.state='hostile'; alertRooms[s.room]=true; }
+  });
+  if(got) toast('شرطة! ضع سلاحك!','info'); else toast('لا أحد يسمعك هنا','info');
+}
+function doFire(){
+  if(state!=='playing') return;
+  stats.shotsFired++;
+  // forgiving aim-assist: snap onto nearest valid target within a wide cone & line of sight
+  var ang=player.ang, bestDiff=0.35;
+  suspects.forEach(function(s){
+    if(s.state==='down'||s.state==='arrested') return;
+    var a=Math.atan2(s.y-player.y,s.x-player.x);
+    var diff=Math.abs(Math.atan2(Math.sin(a-player.ang),Math.cos(a-player.ang)));
+    var d=Math.hypot(s.x-player.x,s.y-player.y);
+    if(diff<bestDiff && d<420 && hasLOS(player.x,player.y,s.x,s.y)){ bestDiff=diff; ang=a; }
+  });
+  var res=raycastHit(player.x,player.y,ang,420);
+  flashes.push({x:player.x,y:player.y,tx:res.x,ty:res.y,t:0.08});
+  if(res.hit==='ent'){
+    var s=res.ent;
+    if(s.kind==='civilian'){ s.state='down'; stats.casualty++; score-=50; pens.push('أصبت مدنيًا (-50)'); toast('أصبت مدنيًا!','bad'); }
+    else if(s.state==='surrendered'){ s.state='down'; stats.casualty++; score-=50; pens.push('أطلقت على مستسلم (-50)'); toast('كان مستسلمًا!','bad'); }
+    else if(s.state==='idle'){ s.state='down'; stats.neutralized++; score-=15; pens.push('إطلاق دون إنذار (-15)'); alertRooms[s.room]=true; toast('بلا إنذار مسبق','bad'); }
+    else { s.state='down'; stats.neutralized++; score+=10; toast('تم التحييد','good'); alertRooms[s.room]=true; }
+  }
+  updateObjectives();
+}
+
+// ---------- AI + LOOP ----------
+var last=performance.now();
+function suspectShoot(s,dt){
+  s._cd=(s._cd||0)-dt;
+  if(s._cd>0) return;
+  if(!hasLOS(s.x,s.y,player.x,player.y)) return;
+  var d=Math.hypot(s.x-player.x,s.y-player.y);
+  if(d>320) return;
+  s._cd=0.9+Math.random()*0.7;
+  var chance=Math.max(0,1-d/320);
+  if(Math.random()<chance*0.8){
+    var dmg=5+Math.random()*7;
+    player.hp-=dmg; updateHP();
+    flashes.push({x:s.x,y:s.y,tx:player.x,ty:player.y,t:0.08});
+    if(player.hp<=0){ fail(); }
+  }
+}
+function step(dt){
+  if(state!=='playing') return;
+  elapsed+=dt;
+  var mx=0,my=0;
+  if(isTouch){
+    mx=moveVec.x; my=moveVec.y;
+    if(Math.hypot(mx,my)>0.25) player.ang=Math.atan2(my,mx);
+  } else {
+    if(keys.KeyW) my-=1; if(keys.KeyS) my+=1; if(keys.KeyA) mx-=1; if(keys.KeyD) mx+=1;
+    var l=Math.hypot(mx,my); if(l>0){mx/=l;my/=l;}
+  }
+  var nx=player.x+mx*player.speed*dt, ny=player.y+my*player.speed*dt;
+  var p=resolveWalls(nx,ny,16); player.x=p.x; player.y=p.y;
+  player.x=Math.max(30,Math.min(930,player.x)); player.y=Math.max(30,Math.min(510,player.y));
+
+  var near=null;
+  suspects.forEach(function(s){ if(s.state==='surrendered' && Math.hypot(s.x-player.x,s.y-player.y)<55) near=s; });
+  var hw=document.getElementById('holdwrap');
+  if(holding && near){
+    holdT=(holdT||0)+dt;
+    hw.className='on'; document.getElementById('holdbar').firstElementChild.style.width=Math.min(100,holdT/0.8*100)+'%';
+    if(holdT>=0.8){ near.state='arrested'; stats.arrested++; score+=20; toast('تم التقييد','good'); updateObjectives(); holdT=0; hw.className=''; }
+  } else { holdT=0; hw.className=''; }
+
+  suspects.forEach(function(s){
+    if(s.kind==='civilian' && s.state==='idle' && Math.hypot(s.x-player.x,s.y-player.y)<34){
+      s.state='rescued'; stats.rescued++; score+=15; toast('مدني بأمان','good'); updateObjectives();
+    }
+  });
+
+  suspects.forEach(function(s){
+    if(s.kind!=='armed') return;
+    if(s.state==='idle' && !s.compliant && Math.hypot(s.x-player.x,s.y-player.y)<85 && hasLOS(s.x,s.y,player.x,player.y)){
+      s.state='hostile'; alertRooms[s.room]=true;
+    }
+    if(alertRooms[s.room] && s.state==='idle') s.state='hostile';
+    if(s.state==='hostile') suspectShoot(s,dt);
+  });
+
+  flashes=flashes.filter(function(f){ f.t-=dt; return f.t>0; });
+
+  if(armedLeft()===0){
+    var inExit = player.x>EXIT.x && player.x<EXIT.x+EXIT.w && player.y>EXIT.y && player.y<EXIT.y+EXIT.h;
+    if(inExit) finish();
+  }
+  updateObjectives();
+}
+
+// ---------- SPRITES ----------
+function drawPerson(x,y,ang,role,st,variant){
+  ctx.save(); ctx.translate(x,y);
+  if(st==='down'){
+    ctx.globalAlpha=.8; ctx.fillStyle='#4a4a52';
+    ctx.beginPath(); ctx.ellipse(0,0,16,9,ang,0,7); ctx.fill();
+    ctx.restore(); return;
+  }
+  ctx.rotate(ang);
+  var bodyCol, headCol='#d8b48c';
+  if(role==='police') bodyCol='#1f3a5f';
+  else if(role==='civilian') bodyCol = variant==='a' ? '#3fae6a' : '#d98a3f';
+  else bodyCol = st==='surrendered' ? '#8a7a2a' : '#6b2329';
+  ctx.fillStyle=bodyCol;
+  ctx.beginPath(); ctx.ellipse(0,0,13,10,0,0,7); ctx.fill();
+  ctx.fillStyle=headCol;
+  ctx.beginPath(); ctx.arc(3,0,6.5,0,7); ctx.fill();
+  if(role==='police'){
+    ctx.fillStyle='#0d1b2e'; ctx.beginPath(); ctx.arc(3,0,6.6,Math.PI*0.72,Math.PI*1.78); ctx.fill();
+    ctx.fillStyle='#f4c21b'; ctx.beginPath(); ctx.arc(-3,-6,1.6,0,7); ctx.fill();
+    ctx.strokeStyle='#dff6e6'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(9,0); ctx.lineTo(25,0); ctx.stroke();
+  } else if(role==='suspect'){
+    ctx.fillStyle='#1a1a1a'; ctx.fillRect(-2,-7,10,3);
+    if(st==='hostile'){ ctx.strokeStyle='#2a2a2a'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(8,0); ctx.lineTo(21,0); ctx.stroke(); }
+    if(st==='surrendered'){ ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(-6,-4);ctx.lineTo(-13,-13); ctx.moveTo(-6,4);ctx.lineTo(-13,13); ctx.stroke(); }
+  }
+  ctx.restore();
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#1a2230'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = armedLeft()===0 ? 'rgba(67,196,123,.35)' : 'rgba(244,194,27,.28)';
+  ctx.fillRect(EXIT.x,EXIT.y,EXIT.w,EXIT.h);
+  ctx.strokeStyle='#f4c21b'; ctx.setLineDash([8,6]); ctx.strokeRect(EXIT.x,EXIT.y,EXIT.w,EXIT.h); ctx.setLineDash([]);
+
+  ctx.fillStyle='#283447';
+  walls.forEach(function(w){ ctx.fillRect(w.x,w.y,w.w,w.h); });
+
+  flashes.forEach(function(f){
+    ctx.strokeStyle='rgba(244,194,27,'+(f.t/0.08)+')'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(f.x,f.y); ctx.lineTo(f.tx,f.ty); ctx.stroke();
+  });
+
+  suspects.forEach(function(s){
+    if(s.state==='arrested'||s.state==='rescued') return;
+    var role = s.kind==='civilian' ? 'civilian' : 'suspect';
+    var faceAng = s.kind==='armed' ? Math.atan2(player.y-s.y, player.x-s.x) : 0;
+    drawPerson(s.x,s.y,faceAng,role,s.state,s.variant);
+  });
+
+  drawPerson(player.x,player.y,player.ang,'police','ok',null);
+}
+
+function loop(now){
+  var dt=Math.min(0.05,(now-last)/1000); last=now;
+  step(dt); draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// ---------- FLOW ----------
+function show(id){ document.querySelectorAll('.scr').forEach(function(s){s.className='scr';}); if(id) document.getElementById(id).className='scr on'; }
+function pause(){ if(state!=='playing') return; state='paused'; show('scPause'); }
+function resume(){ state='playing'; show(null); }
+function fail(){ state='failed'; endScreen(false); }
+function finish(){ state='won'; endScreen(true); }
+
+function grade(){
+  if(stats.casualty>0) return score>=40?'D':'F';
+  if(score>=150) return 'S'; if(score>=110) return 'A'; if(score>=75) return 'B'; if(score>=40) return 'C'; if(score>=0) return 'D';
+  return 'F';
+}
+function endScreen(won){
+  document.getElementById('rTitle').textContent = won ? 'اكتملت العملية' : 'فشلت العملية';
+  document.getElementById('grade').textContent = won ? grade() : 'F';
+  document.getElementById('rStats').innerHTML =
+    '<dt>النقاط</dt><dd>'+score+'</dd>'+
+    '<dt>مُقيَّدون</dt><dd>'+stats.arrested+'</dd>'+
+    '<dt>مُحيّدون</dt><dd>'+stats.neutralized+'</dd>'+
+    '<dt>مدنيون أُنقذوا</dt><dd>'+stats.rescued+'</dd>'+
+    '<dt>الوقت</dt><dd>'+Math.round(elapsed)+' ث</dd>';
+  document.getElementById('rPens').innerHTML = pens.length? pens.map(function(p){return '<li>'+p+'</li>';}).join('') : '<li style="color:#9be0b6">تنفيذ نظيف — لا مخالفات</li>';
+  document.getElementById('hud').className='';
+  document.body.classList.remove('playing');
+  show('scResult');
+}
+
+function startGame(){ reset(); document.getElementById('hud').className='on'; document.body.classList.add('playing'); show(null); }
+document.getElementById('bStart').onclick=startGame;
+document.getElementById('bHow').onclick=function(){show('scHow');};
+document.getElementById('bHowBack').onclick=function(){show('scTitle');};
+document.getElementById('bResume').onclick=resume;
+document.getElementById('bRestart').onclick=startGame;
+document.getElementById('bMenu1').onclick=function(){ document.getElementById('hud').className=''; document.body.classList.remove('playing'); show('scTitle'); };
+document.getElementById('bAgain').onclick=startGame;
+document.getElementById('bMenu2').onclick=function(){ document.getElementById('hud').className=''; document.body.classList.remove('playing'); show('scTitle'); };
+})();
+</script>
+</body>
+</html>
